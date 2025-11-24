@@ -263,10 +263,20 @@ app.all("*", async (req, res) => {
     }
     const userAgent = randUA();
 
+    // Determine Referer based on avid or bvid query parameters
+    let referer = "https://www.bilibili.com/";
+    if (req.query.avid) {
+      // Extract the numeric part from avid (e.g., "av364108" -> "364108")
+      const avidValue = req.query.avid.toString().replace(/^av/i, '');
+      referer = `https://www.bilibili.com/video/av${avidValue}`;
+    } else if (req.query.bvid) {
+      referer = `https://www.bilibili.com/video/${req.query.bvid}`;
+    }
+
     let headers = {
       ...req.headers,
       "User-Agent": userAgent, // This will override any existing User-Agent
-      Referer: "https://www.bilibili.com/",
+      Referer: referer,
     };
 
     // Remove problematic headers that could reveal proxy infrastructure

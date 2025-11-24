@@ -1,7 +1,7 @@
 import express from "express";
 import axios from "axios";
 import crypto from "crypto";
-import { randUA } from "@ahmedrangel/rand-user-agent";
+import UserAgent from "user-agents";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { HttpProxyAgent } from "http-proxy-agent";
 import { config } from "./config.js";
@@ -15,6 +15,9 @@ const PROXY_ENABLED = config.proxy.enabled;
 const PROXY_URL = config.proxy.url;
 const httpAgent = PROXY_ENABLED && PROXY_URL ? new HttpProxyAgent(PROXY_URL) : undefined;
 const httpsAgent = PROXY_ENABLED && PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined;
+
+// Initialize UserAgent generator for Windows Desktop
+const userAgentGenerator = new UserAgent({ deviceCategory: 'desktop', platform: 'Win32' });
 
 // In-memory cache for WBI keys (you could use Redis in production)
 const cache = {
@@ -119,8 +122,7 @@ async function fetchWbiKeys() {
   try {
     const url = "https://api.bilibili.com/x/web-interface/nav";
     let headers = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      "User-Agent": userAgentGenerator().toString(),
     };
     const sessdata = config.bilibili.sessdata;
     if (sessdata) {
@@ -292,7 +294,7 @@ app.all("*", async (req, res) => {
         targetUrl += `?${queryString}`;
       }
     }
-    const userAgent = randUA();
+    const userAgent = userAgentGenerator().toString();
 
     // Determine Referer based on avid or bvid query parameters
     let referer = "https://www.bilibili.com/";

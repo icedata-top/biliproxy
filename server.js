@@ -337,4 +337,13 @@ app.all("*", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {});
+app.listen(PORT, () => {
+  console.log(`Bilibili API reverse proxy server running on port ${PORT}`);
+  console.log(
+    `Using HTTP proxy: ${PROXY_URL.replace(/\/\/.*@/, "//***:***@")}`
+  );
+  console.log("\nEndpoints:");
+  console.log(`  Health check: http://localhost:${PORT}/health`);
+  console.log(`  WBI keys debug: http://localhost:${PORT}/debug/wbi-keys`);
+  console.log(`  Bilibili API: http://localhost:${PORT}/x/web-interface/nav`);
+});

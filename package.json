@@ -1,0 +1,33 @@
+{
+  "name": "biliproxyjs",
+  "version": "1.0.0",
+  "description": "Bilibili API reverse proxy with WBI signature support",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "bilibili",
+    "proxy",
+    "wbi",
+    "reverse-proxy"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ahmedrangel/rand-user-agent": "^2.0.23",
+    "axios": "^1.11.0",
+    "express": "^4.21.2",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

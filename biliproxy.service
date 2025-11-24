@@ -1,0 +1,43 @@
+[Unit]
+Description=Bilibili API Reverse Proxy Server
+Documentation=https://github.com/yourusername/biliproxyjs
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=nodejs
+Group=nodejs
+WorkingDirectory=/opt/biliproxyjs
+Environment=NODE_ENV=production
+Environment=PORT=30002
+EnvironmentFile=-/opt/biliproxyjs/.env
+ExecStart=/usr/bin/node server.js
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=5
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/biliproxyjs
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=biliproxy
+
+# Resource limits
+LimitNOFILE=8192
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

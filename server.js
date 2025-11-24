@@ -97,10 +97,14 @@ function getMixinKey(orig) {
 async function fetchWbiKeys() {
   try {
     const url = "https://api.bilibili.com/x/web-interface/nav";
-    const headers = {
+    let headers = {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
     };
+    const sessdata = config.bilibili.sessdata;
+    if (sessdata) {
+      headers.cookie = `SESSDATA=${sessdata}`;
+    }
 
     const axiosConfig = {
       headers,
@@ -281,6 +285,11 @@ app.all("*", async (req, res) => {
       Referer: referer,
       Origin: referer,
     };
+
+    // Add SESSDATA cookie if configured for authenticated requests
+    if (config.bilibili.sessdata) {
+      headers.Cookie = `SESSDATA=${config.bilibili.sessdata}`;
+    }
 
     // Remove problematic headers that could reveal proxy infrastructure
     delete headers.host;

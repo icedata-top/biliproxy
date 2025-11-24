@@ -26,12 +26,23 @@ const httpResponseBytesTotal = new client.Counter({
     labelNames: ['method', 'route', 'code']
 });
 
+// Create a gauge metric for uptime
+const uptime = new client.Gauge({
+    name: 'biliproxy_uptime_seconds',
+    help: 'Uptime of the application in seconds',
+    collect() {
+        this.set(process.uptime());
+    }
+});
+
 // Register the metrics
 register.registerMetric(httpRequestDurationMs);
 register.registerMetric(httpResponseBytesTotal);
+register.registerMetric(uptime);
 
 export {
     register,
     httpRequestDurationMs,
-    httpResponseBytesTotal
+    httpResponseBytesTotal,
+    uptime
 };

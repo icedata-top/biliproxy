@@ -10,9 +10,10 @@ const app = express();
 const PORT = config.server.port;
 
 // HTTP Proxy configuration
+const PROXY_ENABLED = config.proxy.enabled;
 const PROXY_URL = config.proxy.url;
-const httpAgent = new HttpProxyAgent(PROXY_URL);
-const httpsAgent = new HttpsProxyAgent(PROXY_URL);
+const httpAgent = PROXY_ENABLED && PROXY_URL ? new HttpProxyAgent(PROXY_URL) : undefined;
+const httpsAgent = PROXY_ENABLED && PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined;
 
 // In-memory cache for WBI keys (you could use Redis in production)
 const cache = {
@@ -101,12 +102,16 @@ async function fetchWbiKeys() {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
     };
 
-    const response = await axios.get(url, {
+    const axiosConfig = {
       headers,
-      httpAgent,
-      httpsAgent,
       timeout: config.proxy.timeout,
-    });
+    };
+
+    // Only add proxy agents if proxy is enabled
+    if (httpAgent) axiosConfig.httpAgent = httpAgent;
+    if (httpsAgent) axiosConfig.httpsAgent = httpsAgent;
+
+    const response = await axios.get(url, axiosConfig);
 
     if (response.data?.data?.wbi_img) {
       const imgUrl = response.data.data.wbi_img.img_url;
@@ -206,7 +211,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    proxy: PROXY_URL.replace(/\/\/.*@/, "//***:***@"), // Hide credentials
+    proxy: PROXY_ENABLED ? (PROXY_URL.replace(/\/\/.*@/, "//***:***@")) : "disabled",
   });
 });
 
@@ -277,16 +282,20 @@ app.all("*", async (req, res) => {
     delete headers["cf-ray"];
     delete headers["cf-visitor"];
 
-    const response = await axios({
+    const axiosConfig = {
       method: req.method,
       url: targetUrl,
       headers,
       data: req.body,
-      httpAgent,
-      httpsAgent,
       timeout: config.proxy.timeout,
       validateStatus: () => true,
-    });
+    };
+
+    // Only add proxy agents if proxy is enabled
+    if (httpAgent) axiosConfig.httpAgent = httpAgent;
+    if (httpsAgent) axiosConfig.httpsAgent = httpsAgent;
+
+    const response = await axios(axiosConfig);
 
     const endTime = Date.now();
     const timePassed = endTime - startTime;
@@ -339,9 +348,13 @@ app.all("*", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Bilibili API reverse proxy server running on port ${PORT}`);
-  console.log(
-    `Using HTTP proxy: ${PROXY_URL.replace(/\/\/.*@/, "//***:***@")}`
-  );
+  if (PROXY_ENABLED && PROXY_URL) {
+    console.log(
+      `Using HTTP proxy: ${PROXY_URL.replace(/\/\/.*@/, "//***:***@")}`
+    );
+  } else {
+    console.log(`Proxy: disabled - direct connection`);
+  }
   console.log("\nEndpoints:");
   console.log(`  Health check: http://localhost:${PORT}/health`);
   console.log(`  WBI keys debug: http://localhost:${PORT}/debug/wbi-keys`);

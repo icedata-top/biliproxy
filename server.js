@@ -277,6 +277,7 @@ app.all("*", async (req, res) => {
       ...req.headers,
       "User-Agent": userAgent, // This will override any existing User-Agent
       Referer: referer,
+      Origin: referer,
     };
 
     // Remove problematic headers that could reveal proxy infrastructure

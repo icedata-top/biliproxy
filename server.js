@@ -40,14 +40,14 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     const duration = Date.now() - start;
     httpRequestDurationMs
-      .labels(req.method, req.route ? req.route.path : req.path, res.statusCode)
+      .labels(req.method, req.path, res.statusCode)
       .observe(duration);
 
     // Record response size
     const contentLength = res.get('Content-Length');
     if (contentLength) {
       httpResponseBytesTotal
-        .labels(req.method, req.route ? req.route.path : req.path, res.statusCode)
+        .labels(req.method, req.path, res.statusCode)
         .inc(parseInt(contentLength));
     }
   });

@@ -81,7 +81,7 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 12,
+                "w": 8,
                 "x": 0,
                 "y": 0
             },
@@ -111,7 +111,7 @@
                     "refId": "A"
                 }
             ],
-            "title": "Request Rate (req/s)",
+            "title": "req/s",
             "type": "timeseries"
         },
         {
@@ -174,8 +174,8 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 12,
-                "x": 12,
+                "w": 8,
+                "x": 8,
                 "y": 0
             },
             "id": 2,
@@ -206,6 +206,67 @@
             ],
             "title": "Error Rate (%)",
             "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "ds-prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 16,
+                "y": 0
+            },
+            "id": 7,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "values": []
+                },
+                "pieType": "pie",
+                "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                }
+            },
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "prometheus",
+                        "uid": "ds-prometheus"
+                    },
+                    "editorMode": "code",
+                    "expr": "sum by(code) (biliproxy_http_request_duration_ms_count)",
+                    "legendFormat": "{{code}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Status Codes",
+            "type": "piechart"
         },
         {
             "datasource": {
@@ -581,7 +642,7 @@
                         "uid": "ds-prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "rate(biliproxy_process_cpu_user_secontotal[1m])",
+                    "expr": "rate(biliproxy_process_cpu_user_seconds_total[1m])",
                     "legendFormat": "User CPU",
                     "range": true,
                     "refId": "A"
@@ -592,7 +653,7 @@
                         "uid": "ds-prometheus"
                     },
                     "editorMode": "code",
-                    "expr": "rate(biliproxy_process_cpu_system_secontotal[1m])",
+                    "expr": "rate(biliproxy_process_cpu_system_seconds_total[1m])",
                     "legendFormat": "System CPU",
                     "range": true,
                     "refId": "B"

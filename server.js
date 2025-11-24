@@ -271,6 +271,8 @@ app.all("*", async (req, res) => {
       referer = `https://www.bilibili.com/video/av${avidValue}`;
     } else if (req.query.bvid) {
       referer = `https://www.bilibili.com/video/${req.query.bvid}`;
+    } else if (req.query.aid) {
+      referer = `https://www.bilibili.com/video/av${req.query.aid}`;
     }
 
     let headers = {

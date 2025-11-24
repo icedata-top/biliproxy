@@ -5,6 +5,7 @@ import { randUA } from "@ahmedrangel/rand-user-agent";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { HttpProxyAgent } from "http-proxy-agent";
 import { config } from "./config.js";
+import { register, httpRequestDurationMs, httpResponseBytesTotal } from "./metrics.js";
 
 const app = express();
 const PORT = config.server.port;
@@ -32,6 +33,26 @@ const MIXIN_KEY_ENC_TAB = [
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Metrics middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    httpRequestDurationMs
+      .labels(req.method, req.route ? req.route.path : req.path, res.statusCode)
+      .observe(duration);
+
+    // Record response size
+    const contentLength = res.get('Content-Length');
+    if (contentLength) {
+      httpResponseBytesTotal
+        .labels(req.method, req.route ? req.route.path : req.path, res.statusCode)
+        .inc(parseInt(contentLength));
+    }
+  });
+  next();
+});
 
 // CORS middleware
 app.use((req, res, next) => {
@@ -217,6 +238,12 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     proxy: PROXY_ENABLED ? (PROXY_URL.replace(/\/\/.*@/, "//***:***@")) : "disabled",
   });
+});
+
+// Metrics endpoint
+app.get("/metrics", async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
 });
 
 // WBI keys debug endpoint

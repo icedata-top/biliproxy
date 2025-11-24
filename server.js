@@ -316,8 +316,20 @@ app.all("*", async (req, res) => {
     };
 
     // Add SESSDATA cookie if configured for authenticated requests
+    const extraCookies = [];
     if (config.bilibili.sessdata) {
-      headers.Cookie = `SESSDATA=${config.bilibili.sessdata}`;
+      extraCookies.push(`SESSDATA=${config.bilibili.sessdata}`);
+    }
+
+    // Generate random DedeUserID and DedeUserID__ckMd5
+    const dedeUserID = Math.floor(Math.pow(Math.random(), 4) * 1000000000000);
+    const dedeUserID__ckMd5 = crypto.randomBytes(8).toString('hex');
+
+    extraCookies.push(`DedeUserID=${dedeUserID}`);
+    extraCookies.push(`DedeUserID__ckMd5=${dedeUserID__ckMd5}`);
+
+    if (extraCookies.length > 0) {
+      headers.Cookie = extraCookies.join('; ');
     }
 
     // Remove problematic headers that could reveal proxy infrastructure

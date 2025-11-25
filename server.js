@@ -262,6 +262,36 @@ app.get("/debug/wbi-keys", async (req, res) => {
   }
 });
 
+/**
+ * Axios wrapper with auto-retry logic
+ * Retries on non-200 status codes, max 5 times, no wait
+ * But if 404, pass through immediately
+ */
+async function axiosWithRetry(config, maxRetries = 5) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const response = await axios(config);
+    
+    // If 404, pass it through immediately
+    if (response.status === 404) {
+      return response;
+    }
+    
+    // If 200, return success
+    if (response.status === 200) {
+      return response;
+    }
+    
+    // If not 200 and not 404, retry (unless max retries reached)
+    if (attempt < maxRetries) {
+      console.log(`⚠️  Retry ${attempt}/${maxRetries - 1} - Status: ${response.status}`);
+      continue;
+    }
+    
+    // Max retries reached, return last response
+    return response;
+  }
+}
+
 // Robots.txt to discourage scanners
 app.get("/robots.txt", (req, res) => {
   res.type("text/plain");
@@ -372,7 +402,7 @@ app.all("*", async (req, res) => {
     if (httpAgent) axiosConfig.httpAgent = httpAgent;
     if (httpsAgent) axiosConfig.httpsAgent = httpsAgent;
 
-    const response = await axios(axiosConfig);
+    const response = await axiosWithRetry(axiosConfig);
 
     const endTime = Date.now();
     const timePassed = endTime - startTime;

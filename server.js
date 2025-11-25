@@ -422,6 +422,8 @@ app.all("*", async (req, res) => {
       console.log(`  Cookies:`, req.cookies);
       console.log(`  User-Agent: ${userAgent}`);
       console.log(`  Response data:`, response.data);
+      console.log(`  Req:`, req);
+      console.log(`  Res:`, res);
     }
 
     // Set response headers

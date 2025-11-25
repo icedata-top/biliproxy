@@ -266,9 +266,12 @@ app.get("/debug/wbi-keys", async (req, res) => {
  * Axios wrapper with auto-retry logic
  * Retries on non-200 status codes, max 5 times, no wait
  * But if 404, pass through immediately
+ * Regenerates all signings and cookies on each retry attempt
  */
-async function axiosWithRetry(config, maxRetries = 5) {
+async function axiosWithRetry(configBuilder, maxRetries = 5) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Regenerate config on each attempt (fresh signatures, cookies, user-agent)
+    const config = await configBuilder();
     const response = await axios(config);
     
     // If 404, pass it through immediately
@@ -283,7 +286,7 @@ async function axiosWithRetry(config, maxRetries = 5) {
     
     // If not 200 and not 404, retry (unless max retries reached)
     if (attempt < maxRetries) {
-      console.log(`⚠️  Retry ${attempt}/${maxRetries - 1} - Status: ${response.status}`);
+      console.log(`⚠️  Retry ${attempt}/${maxRetries - 1} - Status: ${response.status} - Regenerating signatures & cookies...`);
       continue;
     }
     
@@ -319,27 +322,6 @@ app.all("*", async (req, res) => {
       shouldSign = true;
     }
 
-    // For GET requests, sign the parameters if needed
-    if (req.method === "GET") {
-      let signedParams = req.query;
-      
-      if (shouldSign) {
-        signedParams = await signWithWbi(req.query);
-      }
-
-      const queryString = Object.entries(signedParams)
-        .map(
-          ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
-        )
-        .join("&");
-
-      if (queryString) {
-        targetUrl += `?${queryString}`;
-      }
-    }
-    const userAgent = userAgentGenerator().toString();
-
     // Determine Referer based on avid or bvid query parameters
     let referer = "https://www.bilibili.com/";
     if (req.query.avid) {
@@ -352,57 +334,87 @@ app.all("*", async (req, res) => {
       referer = `https://www.bilibili.com/video/av${req.query.aid}`;
     }
 
-    let headers = {
-      ...req.headers,
-      "User-Agent": userAgent, // This will override any existing User-Agent
-      Referer: referer,
-      Origin: referer,
+    // Create a config builder function that regenerates everything on each call
+    const buildAxiosConfig = async () => {
+      let url = targetUrl;
+      
+      // For GET requests, sign the parameters if needed
+      if (req.method === "GET") {
+        let signedParams = req.query;
+        
+        if (shouldSign) {
+          signedParams = await signWithWbi(req.query);
+        }
+
+        const queryString = Object.entries(signedParams)
+          .map(
+            ([key, value]) =>
+              `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+          )
+          .join("&");
+
+        if (queryString) {
+          url += `?${queryString}`;
+        }
+      }
+
+      // Regenerate user agent
+      const userAgent = userAgentGenerator().toString();
+
+      let headers = {
+        ...req.headers,
+        "User-Agent": userAgent,
+        Referer: referer,
+        Origin: referer,
+      };
+
+      // Add SESSDATA cookie if configured for authenticated requests
+      const extraCookies = [];
+      if (config.bilibili.sessdata) {
+        extraCookies.push(`SESSDATA=${config.bilibili.sessdata}`);
+      }
+
+      // Generate random DedeUserID and DedeUserID__ckMd5
+      const dedeUserID = Math.floor(Math.pow(Math.random(), 4) * 1000000000000);
+      const dedeUserID__ckMd5 = crypto.randomBytes(8).toString('hex');
+
+      extraCookies.push(`DedeUserID=${dedeUserID}`);
+      extraCookies.push(`DedeUserID__ckMd5=${dedeUserID__ckMd5}`);
+
+      if (extraCookies.length > 0) {
+        headers.Cookie = extraCookies.join('; ');
+      }
+
+      // Remove problematic headers that could reveal proxy infrastructure
+      delete headers.host;
+      delete headers["content-length"];
+      delete headers["x-forwarded-for"];
+      delete headers["x-forwarded-host"];
+      delete headers["x-forwarded-proto"];
+      delete headers["via"];
+      delete headers["x-real-ip"];
+      delete headers["cf-connecting-ip"];
+      delete headers["cf-ipcountry"];
+      delete headers["cf-ray"];
+      delete headers["cf-visitor"];
+
+      const axiosConfig = {
+        method: req.method,
+        url: url,
+        headers,
+        data: req.body,
+        timeout: config.proxy.timeout,
+        validateStatus: () => true,
+      };
+
+      // Only add proxy agents if proxy is enabled
+      if (httpAgent) axiosConfig.httpAgent = httpAgent;
+      if (httpsAgent) axiosConfig.httpsAgent = httpsAgent;
+
+      return axiosConfig;
     };
 
-    // Add SESSDATA cookie if configured for authenticated requests
-    const extraCookies = [];
-    if (config.bilibili.sessdata) {
-      extraCookies.push(`SESSDATA=${config.bilibili.sessdata}`);
-    }
-
-    // Generate random DedeUserID and DedeUserID__ckMd5
-    const dedeUserID = Math.floor(Math.pow(Math.random(), 4) * 1000000000000);
-    const dedeUserID__ckMd5 = crypto.randomBytes(8).toString('hex');
-
-    extraCookies.push(`DedeUserID=${dedeUserID}`);
-    extraCookies.push(`DedeUserID__ckMd5=${dedeUserID__ckMd5}`);
-
-    if (extraCookies.length > 0) {
-      headers.Cookie = extraCookies.join('; ');
-    }
-
-    // Remove problematic headers that could reveal proxy infrastructure
-    delete headers.host;
-    delete headers["content-length"];
-    delete headers["x-forwarded-for"];
-    delete headers["x-forwarded-host"];
-    delete headers["x-forwarded-proto"];
-    delete headers["via"];
-    delete headers["x-real-ip"];
-    delete headers["cf-connecting-ip"];
-    delete headers["cf-ipcountry"];
-    delete headers["cf-ray"];
-    delete headers["cf-visitor"];
-
-    const axiosConfig = {
-      method: req.method,
-      url: targetUrl,
-      headers,
-      data: req.body,
-      timeout: config.proxy.timeout,
-      validateStatus: () => true,
-    };
-
-    // Only add proxy agents if proxy is enabled
-    if (httpAgent) axiosConfig.httpAgent = httpAgent;
-    if (httpsAgent) axiosConfig.httpsAgent = httpsAgent;
-
-    const response = await axiosWithRetry(axiosConfig);
+    const response = await axiosWithRetry(buildAxiosConfig);
 
     const endTime = Date.now();
     const timePassed = endTime - startTime;
@@ -415,15 +427,10 @@ app.all("*", async (req, res) => {
       console.log(`❌ Non-200 response details:`);
       console.log(`  Method: ${req.method}`);
       console.log(`  Original URL: ${req.originalUrl}`);
-      console.log(`  Target URL: ${targetUrl}`);
       console.log(`  Status: ${response.status}`);
       console.log(`  Time: ${timePassed}ms`);
-      console.log(`  Signed params:`, req.query);
-      console.log(`  Cookies:`, req.cookies);
-      console.log(`  User-Agent: ${userAgent}`);
+      console.log(`  Query params:`, req.query);
       console.log(`  Response data:`, response.data);
-      console.log(`  Req:`, req);
-      console.log(`  Res:`, res);
     }
 
     // Set response headers

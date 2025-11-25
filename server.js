@@ -277,11 +277,25 @@ app.all("*", async (req, res) => {
     }
 
     const startTime = Date.now();
-    let targetUrl = `https://api.bilibili.com${req.path}`;
+    let targetUrl = "";
+    let shouldSign = true;
 
-    // For GET requests, sign the parameters
+    // Handle /apivc requests
+    if (req.path.startsWith("/apivc")) {
+      targetUrl = `https://api.vc.bilibili.com${req.path.replace("/apivc", "")}`;
+      shouldSign = false; // api.vc.bilibili.com does not require WBI signing
+    } else {
+      targetUrl = `https://api.bilibili.com${req.path}`;
+      shouldSign = true;
+    }
+
+    // For GET requests, sign the parameters if needed
     if (req.method === "GET") {
-      const signedParams = await signWithWbi(req.query);
+      let signedParams = req.query;
+      
+      if (shouldSign) {
+        signedParams = await signWithWbi(req.query);
+      }
 
       const queryString = Object.entries(signedParams)
         .map(

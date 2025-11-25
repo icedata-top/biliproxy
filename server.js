@@ -419,6 +419,7 @@ app.all("*", async (req, res) => {
       console.log(`  Status: ${response.status}`);
       console.log(`  Time: ${timePassed}ms`);
       console.log(`  Signed params:`, req.query);
+      console.log(`  Cookies:`, req.cookies);
       console.log(`  User-Agent: ${userAgent}`);
       console.log(`  Response data:`, response.data);
     }

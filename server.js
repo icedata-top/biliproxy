@@ -42,15 +42,20 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
+    // Normalize route for metrics to avoid high cardinality
+    let route = req.path;
+    if (route.startsWith('/cover/')) {
+      route = '/cover';
+    }
     httpRequestDurationMs
-      .labels(req.method, req.path, res.statusCode)
+      .labels(req.method, route, res.statusCode)
       .observe(duration);
 
     // Record response size
     const contentLength = res.get('Content-Length');
     if (contentLength) {
       httpResponseBytesTotal
-        .labels(req.method, req.path, res.statusCode)
+        .labels(req.method, route, res.statusCode)
         .inc(parseInt(contentLength));
     }
   });
@@ -299,6 +304,64 @@ async function axiosWithRetry(configBuilder, maxRetries = 5) {
 app.get("/robots.txt", (req, res) => {
   res.type("text/plain");
   res.send("User-agent: *\nDisallow: /\n");
+});
+
+// Cover image proxy: /cover/:filename -> https://i0.hdslb.com/bfs/archive/:filename
+app.get("/cover/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const targetUrl = `https://i0.hdslb.com/bfs/archive/${filename}`;
+
+    const userAgent = userAgentGenerator().toString();
+
+    // Generate random DedeUserID and DedeUserID__ckMd5
+    const dedeUserID = Math.floor(Math.pow(Math.random(), 4) * 1000000000000);
+    const dedeUserID__ckMd5 = crypto.randomBytes(8).toString('hex');
+
+    const axiosConfig = {
+      method: "GET",
+      url: targetUrl,
+      headers: {
+        "User-Agent": userAgent,
+        Referer: "https://www.bilibili.com/",
+        Cookie: `DedeUserID=${dedeUserID}; DedeUserID__ckMd5=${dedeUserID__ckMd5}`,
+      },
+      responseType: "arraybuffer",
+      timeout: config.proxy.timeout,
+      validateStatus: () => true,
+    };
+
+    // Only add proxy agents if proxy is enabled
+    if (httpAgent) axiosConfig.httpAgent = httpAgent;
+    if (httpsAgent) axiosConfig.httpsAgent = httpsAgent;
+
+    const response = await axios(axiosConfig);
+
+    console.log(`Cover: ${response.status} - ${filename}`);
+
+    // Set response headers
+    Object.entries(response.headers).forEach(([key, value]) => {
+      if (
+        !["connection", "transfer-encoding", "content-encoding"].includes(
+          key.toLowerCase()
+        )
+      ) {
+        res.set(key, value);
+      }
+    });
+
+    // Add CORS headers
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+
+    res.status(response.status).send(response.data);
+  } catch (error) {
+    console.error("Cover proxy error:", error);
+    res.status(500).json({
+      error: "Cover proxy request failed",
+      message: error.message,
+    });
+  }
 });
 
 app.all("*", async (req, res) => {

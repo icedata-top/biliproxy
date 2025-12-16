@@ -376,11 +376,18 @@ app.all("*", async (req, res) => {
     let targetUrl = "";
     let shouldSign = true;
 
-    // Handle /apivc requests
-    if (req.path.startsWith("/apivc")) {
+    // Handle generic proxy requests (e.g. /https://example.com/api)
+    // If the path starts with http:// or https:// (after the initial slash), treat it as a full URL
+    const tryUrl = req.path.substring(1); // Remove leading slash
+    if (tryUrl.startsWith("http://") || tryUrl.startsWith("https://")) {
+      targetUrl = tryUrl;
+      shouldSign = false;
+    } else if (req.path.startsWith("/apivc")) {
+      // Handle /apivc requests
       targetUrl = `https://api.vc.bilibili.com${req.path.replace("/apivc", "")}`;
       shouldSign = false; // api.vc.bilibili.com does not require WBI signing
     } else {
+      // Default to Bilibili API
       targetUrl = `https://api.bilibili.com${req.path}`;
       shouldSign = true;
     }
